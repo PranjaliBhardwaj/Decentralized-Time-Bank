@@ -117,8 +117,14 @@ export default function EscrowPage() {
   React.useEffect(() => {
     if (receipt && hash) {
       try {
-        // Find EscrowCreated event in logs
+        console.log('Attempting to extract escrow ID from receipt:', { receipt, escrowAddress })
+        // Find EscrowCreated event in logs - filter by escrow contract address first
         for (const log of receipt.logs) {
+          // Only check logs from the escrow contract
+          if (log.address?.toLowerCase() !== escrowAddress.toLowerCase()) {
+            continue
+          }
+          
           try {
             // Decode the event using the ABI
             const decoded = decodeEventLog({
@@ -126,6 +132,8 @@ export default function EscrowPage() {
               data: log.data,
               topics: log.topics,
             })
+            
+            console.log('Decoded event:', decoded)
             
             if (decoded.eventName === 'EscrowCreated') {
               const escrowIdFromEvent = decoded.args.escrowId as bigint
@@ -135,6 +143,7 @@ export default function EscrowPage() {
             }
           } catch (e) {
             // Not an EscrowCreated event, continue
+            console.log('Failed to decode log as EscrowCreated:', e)
             continue
           }
         }
@@ -142,7 +151,7 @@ export default function EscrowPage() {
         console.error('Error extracting escrow ID:', error)
       }
     }
-  }, [receipt, hash])
+  }, [receipt, hash, escrowAddress])
   
   // Helper function to extract escrow ID from transaction hash
   const extractEscrowIdFromTxHash = async (txHash: string) => {
@@ -156,17 +165,32 @@ export default function EscrowPage() {
       // Remove 0x prefix if present
       const hash = txHash.startsWith('0x') ? txHash : `0x${txHash}`
       
+      console.log('Fetching transaction receipt for:', hash)
+      
       // Get transaction receipt
       const receipt = await publicClient.getTransactionReceipt({ hash: hash as `0x${string}` })
       
-      // Find EscrowCreated event
+      console.log('Transaction receipt:', receipt)
+      console.log('Looking for EscrowCreated event from contract:', escrowAddress)
+      
+      // Find EscrowCreated event - filter by escrow contract address first
       for (const log of receipt.logs) {
+        // Only check logs from the escrow contract
+        if (log.address?.toLowerCase() !== escrowAddress.toLowerCase()) {
+          console.log('Skipping log from different contract:', log.address)
+          continue
+        }
+        
+        console.log('Checking log from escrow contract:', log)
+        
         try {
           const decoded = decodeEventLog({
             abi: timeEscrowAbi,
             data: log.data,
             topics: log.topics,
           })
+          
+          console.log('Decoded event:', decoded)
           
           if (decoded.eventName === 'EscrowCreated') {
             const escrowIdFromEvent = decoded.args.escrowId as bigint
@@ -176,11 +200,13 @@ export default function EscrowPage() {
             return
           }
         } catch (e) {
+          console.log('Failed to decode log as EscrowCreated:', e)
           continue
         }
       }
       
-      alert('Could not find EscrowCreated event in this transaction. Make sure this is a createEscrow transaction.')
+      console.error('EscrowCreated event not found. Logs:', receipt.logs)
+      alert('Could not find EscrowCreated event in this transaction. Make sure this is a createEscrow transaction and the transaction hash is correct.')
     } catch (error) {
       console.error('Error extracting escrow ID from tx hash:', error)
       alert(`Error: ${error instanceof Error ? error.message : String(error)}`)
@@ -456,7 +482,7 @@ export default function EscrowPage() {
                     if (txHash) extractEscrowIdFromTxHash(txHash)
                   }}
                   disabled={extractingFromTx}
-                  className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 rounded disabled:opacity-50"
+                  className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 rounded disabled:opacity-50 text-white"
                 >
                   {extractingFromTx ? 'Extracting...' : 'Extract ID from Transaction Hash'}
                 </button>
