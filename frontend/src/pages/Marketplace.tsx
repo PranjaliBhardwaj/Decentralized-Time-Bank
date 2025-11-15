@@ -16,18 +16,45 @@ export default function Marketplace() {
   const [incomingCall, setIncomingCall] = React.useState<{ from: string; title: string } | null>(null)
   const backend = CONTRACTS.sepolia.backendBaseUrl
 
-  // Listen for incoming video calls globally
+  // Listen for incoming video calls globally - improved with roomId matching
   React.useEffect(() => {
     if (!socket || !address) return
 
-    const handleCallStatus = (data: { status: string; sender: string }) => {
-      if (data.status === 'calling' && data.sender.toLowerCase() !== address.toLowerCase()) {
+    const handleCallStatus = (data: { status: string; sender: string; roomId?: string }) => {
+      const normalizedSender = data.sender?.toLowerCase()
+      const normalizedAddress = address.toLowerCase()
+      
+      // Only handle calls meant for this user
+      if (normalizedSender === normalizedAddress) {
+        return // Ignore own status updates
+      }
+      
+      // If roomId is provided, verify we're in the same room
+      if (data.roomId) {
+        const expectedRoomId = createRoomId(address, normalizedSender)
+        if (data.roomId !== expectedRoomId) {
+          console.log(`[VideoCall] Ignoring call from different room: ${data.roomId} vs ${expectedRoomId}`)
+          return
+        }
+      }
+      
+      console.log(`[VideoCall] Received call status: ${data.status} from ${normalizedSender}`)
+      
+      if (data.status === 'calling') {
         // Find the listing for this caller
-        const callerListing = listings.find(l => l.owner?.toLowerCase() === data.sender.toLowerCase())
+        const callerListing = listings.find(l => l.owner?.toLowerCase() === normalizedSender)
         setIncomingCall({
-          from: data.sender,
+          from: normalizedSender,
           title: callerListing?.title || 'Service Provider'
         })
+        // Play notification sound (optional)
+        try {
+          const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77+efTRAMUKfj8LZjHAY4kdfyzHksBSR3x/Dej0AKFF606euoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+/nn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3o9AChRetOnrqFUUCkaf4PK+bCEFK4HO8tmJNggZaLvv559NE')
+          audio.volume = 0.3
+          audio.play().catch(() => {}) // Ignore errors if audio fails
+        } catch (e) {
+          // Ignore audio errors
+        }
       } else if (data.status === 'ended' || data.status === 'answered') {
         setIncomingCall(null)
       }

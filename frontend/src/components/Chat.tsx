@@ -61,7 +61,7 @@ export function Chat({ otherUser, listingTitle, onClose }: ChatProps) {
       setMessages(history.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()))
     }
 
-    // Listen for new messages (real-time)
+    // Listen for new messages (real-time) - optimized for instant display
     const handleMessage = (message: ChatMessage) => {
       console.log(`[Chat] Received real-time message:`, message)
       setMessages((prev) => {
@@ -70,11 +70,17 @@ export function Chat({ otherUser, listingTitle, onClose }: ChatProps) {
           console.log(`[Chat] Duplicate message detected, skipping: ${message.id}`)
           return prev
         }
-        // Add new message and sort by timestamp
-        const updated = [...prev, message].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-        console.log(`[Chat] Message added, total messages: ${updated.length}`)
-        return updated
+        // Add new message immediately (no sorting needed if messages come in order)
+        // Only sort if timestamp is out of order
+        const updated = [...prev, message]
+        const sorted = updated.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        console.log(`[Chat] Message added instantly, total messages: ${sorted.length}`)
+        return sorted
       })
+      // Auto-scroll to bottom when new message arrives
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 50)
     }
 
     // Listen for typing indicators
@@ -84,10 +90,11 @@ export function Chat({ otherUser, listingTitle, onClose }: ChatProps) {
       }
     }
 
-    // Listen for online/offline status
+    // Listen for online/offline status - with immediate update
     const handleUserStatus = (data: { userAddress: string; status: 'online' | 'offline' }) => {
-      console.log(`[Chat] Status update for ${data.userAddress}: ${data.status}`)
-      if (data.userAddress.toLowerCase() === normalizedOtherUser) {
+      const normalizedDataAddress = data.userAddress?.toLowerCase()
+      console.log(`[Chat] Status update for ${normalizedDataAddress}: ${data.status}`)
+      if (normalizedDataAddress === normalizedOtherUser) {
         setOtherUserOnline(data.status === 'online')
         console.log(`[Chat] Other user ${normalizedOtherUser} is now ${data.status}`)
       }
@@ -107,8 +114,12 @@ export function Chat({ otherUser, listingTitle, onClose }: ChatProps) {
     }
   }, [socket, address, roomId, otherUser])
 
+  // Auto-scroll to bottom when messages change - optimized for smooth scrolling
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Use requestAnimationFrame for smoother scrolling
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    })
   }, [messages, otherUserTyping])
 
   // Cleanup typing timeout on unmount

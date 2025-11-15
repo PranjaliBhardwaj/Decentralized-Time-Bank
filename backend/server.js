@@ -475,6 +475,12 @@ io.on("connection", (socket) => {
       }
     }
     
+    // Also broadcast to other user that this user is now online
+    if (user1 && user2) {
+      const otherUser = user1.toLowerCase() === normalizedAddress ? user2.toLowerCase() : user1.toLowerCase();
+      io.to(roomId).emit("user-status", { userAddress: normalizedAddress, status: "online" });
+    }
+    
     console.log(`[Chat] User ${normalizedAddress} joined room ${roomId} (socket: ${socket.id})`);
   });
 
@@ -611,9 +617,13 @@ io.on("connection", (socket) => {
       console.warn("[VideoCall] Invalid video-call-status data:", data);
       return;
     }
-    console.log(`[VideoCall] Status update: ${status} in room ${roomId} from ${sender}`);
-    // Broadcast to ALL users in room (including sender for consistency)
-    io.to(roomId).emit("video-call-status", { status, sender: sender.toLowerCase() });
+    const normalizedSender = sender.toLowerCase();
+    console.log(`[VideoCall] Status update: ${status} in room ${roomId} from ${normalizedSender}`);
+    // Broadcast to ALL users in room EXCEPT sender (to avoid self-notifications)
+    // Include roomId in the response so frontend can verify
+    socket.to(roomId).emit("video-call-status", { status, sender: normalizedSender, roomId });
+    // Also emit to sender for consistency (but frontend will ignore own updates)
+    socket.emit("video-call-status", { status, sender: normalizedSender, roomId });
   });
 
   // Disconnect

@@ -58,8 +58,15 @@ export function VideoCall({ otherUser, listingTitle, onClose }: VideoCallProps) 
     // Rejoin on connect/reconnect
     socket.on('connect', joinRoom)
 
-    const handleCallStatus = (data: { status: CallStatus; sender: string }) => {
+    const handleCallStatus = (data: { status: CallStatus; sender: string; roomId?: string }) => {
       const normalizedSender = data.sender?.toLowerCase()
+      
+      // Verify roomId matches if provided
+      if (data.roomId && data.roomId !== roomId) {
+        console.log(`[VideoCall] Ignoring call status from different room: ${data.roomId} vs ${roomId}`)
+        return
+      }
+      
       if (normalizedSender === normalizedAddress) {
         console.log('[VideoCall] Ignoring own status update')
         return // Ignore own status updates
