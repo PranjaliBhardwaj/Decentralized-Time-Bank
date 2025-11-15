@@ -12,7 +12,25 @@ export const timeEscrowAbi = [
       {"name":"amount","type":"uint256"}
     ], "outputs": [{"name":"escrowId","type":"uint256"}] },
   { "type": "function", "name": "confirm", "stateMutability": "nonpayable", "inputs": [{"name":"escrowId","type":"uint256"}], "outputs": [] },
-  { "type": "function", "name": "cancel", "stateMutability": "nonpayable", "inputs": [{"name":"escrowId","type":"uint256"}], "outputs": [] }
+  { "type": "function", "name": "cancel", "stateMutability": "nonpayable", "inputs": [{"name":"escrowId","type":"uint256"}], "outputs": [] },
+  { "type": "event", "name": "EscrowCreated", "inputs": [
+      {"name":"escrowId","type":"uint256","indexed":true},
+      {"name":"requester","type":"address","indexed":true},
+      {"name":"provider","type":"address","indexed":true},
+      {"name":"amount","type":"uint256","indexed":false}
+    ], "anonymous": false },
+  { "type": "event", "name": "EscrowCancelled", "inputs": [
+      {"name":"escrowId","type":"uint256","indexed":true}
+    ], "anonymous": false },
+  { "type": "event", "name": "Confirmed", "inputs": [
+      {"name":"escrowId","type":"uint256","indexed":true},
+      {"name":"user","type":"address","indexed":true}
+    ], "anonymous": false },
+  { "type": "event", "name": "Released", "inputs": [
+      {"name":"escrowId","type":"uint256","indexed":true},
+      {"name":"provider","type":"address","indexed":true},
+      {"name":"amount","type":"uint256","indexed":false}
+    ], "anonymous": false }
 ] as const
 
 

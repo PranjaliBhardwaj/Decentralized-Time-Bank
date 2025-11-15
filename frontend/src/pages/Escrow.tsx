@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react'
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useConfig } from 'wagmi'
+import { useMemo, useState } from 'react'
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { erc20Abi, timeEscrowAbi } from '../lib/abi'
 import { CONTRACTS } from '../lib/contracts'
 
@@ -10,7 +10,6 @@ function formatAmount(v?: bigint) {
 
 export default function EscrowPage() {
   const { address, isConnected } = useAccount()
-  const config = useConfig()
   const [provider, setProvider] = useState('')
   const [amount, setAmount] = useState('1')
   const [escrowId, setEscrowId] = useState<string>('')

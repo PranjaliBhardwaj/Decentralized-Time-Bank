@@ -3,10 +3,12 @@ export const CONTRACTS = {
   sepolia: {
     timeToken: import.meta.env.VITE_TTK_ADDRESS || "0x0000000000000000000000000000000000000000",
     timeEscrow: import.meta.env.VITE_ESCROW_ADDRESS || "0x0000000000000000000000000000000000000000",
+    backendBaseUrl: import.meta.env.VITE_BACKEND_URL || "http://localhost:4000"
   },
   polygonMumbai: {
     timeToken: import.meta.env.VITE_TTK_ADDRESS || "0x0000000000000000000000000000000000000000",
     timeEscrow: import.meta.env.VITE_ESCROW_ADDRESS || "0x0000000000000000000000000000000000000000",
+    backendBaseUrl: import.meta.env.VITE_BACKEND_URL || "http://localhost:4000"
   },
 } as const
 

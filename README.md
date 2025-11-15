@@ -80,3 +80,65 @@ npx hardhat run scripts/deploy.js --network coreTestnet
 - **Chain ID**: 1114
 - **Contract Address**: [To be filled after deployment]
 - **Transaction Hash**: [To be filled after deployment]
+
+## Quick Start
+
+For detailed setup instructions, see **[SETUP.md](./SETUP.md)**
+
+### Quick Setup (TL;DR)
+
+1. **Install dependencies:**
+   ```bash
+   cd backend && npm install
+   cd ../frontend && npm install
+   ```
+
+2. **Configure environment:**
+   - Create `backend/.env` with MongoDB connection:
+     ```env
+     MONGODB_URI=mongodb://localhost:27017
+     DB_NAME=timebank
+     PORT=4000
+     ```
+   - Create `frontend/.env`:
+     ```env
+     VITE_BACKEND_URL=http://localhost:4000
+     ```
+
+3. **Start MongoDB** (local or use MongoDB Atlas)
+
+4. **Start backend** (Terminal 1):
+   ```bash
+   cd backend && npm run dev
+   ```
+
+5. **Start frontend** (Terminal 2):
+   ```bash
+   cd frontend && npm run dev
+   ```
+
+6. **Open browser:** http://localhost:5173
+
+## Tech Stack
+
+- **Frontend:** React + TypeScript + Vite + TailwindCSS + Wagmi + RainbowKit
+- **Backend:** Node.js + Express + MongoDB + Socket.io
+- **Blockchain:** Solidity + Hardhat + Ethereum Sepolia
+- **Storage:** MongoDB (reliable, fast, no IPFS dependencies)
+
+## Backend API
+
+The backend server provides:
+
+- **Listings API:** Create, read, delete service listings (MongoDB)
+- **Chat API:** Real-time messaging with Socket.io + MongoDB persistence
+- **WebRTC Signaling:** Video call support
+- **Health Checks:** `/health`, `/api/test-db`
+
+### Endpoints
+- `GET /health` – Health check
+- `GET /api/test-db` – Test MongoDB connection
+- `GET /api/listings` – Get all listings
+- `POST /api/listings` – Create new listing
+- `DELETE /api/listings/:cid` – Delete listing
+- `GET /api/chat/conversations/:userAddress` – Get user conversations
