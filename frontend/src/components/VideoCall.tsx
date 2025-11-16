@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useSocket, createRoomId } from '../hooks/useSocket'
 
@@ -12,7 +12,7 @@ type CallStatus = 'idle' | 'calling' | 'ringing' | 'answered' | 'ended'
 
 export function VideoCall({ otherUser, listingTitle, onClose }: VideoCallProps) {
   const { address } = useAccount()
-  const { socket, connected } = useSocket()
+  const { socket } = useSocket()
   const [callStatus, setCallStatus] = useState<CallStatus>('idle')
   const [isInitiator, setIsInitiator] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
