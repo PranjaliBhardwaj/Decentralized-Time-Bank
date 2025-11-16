@@ -20,7 +20,20 @@ const io = new Server(server, {
 });
 
 app.use(express.json());
-app.use(cors({ origin: "*" }));
+// CORS: Use environment variable in production, allow all in development
+const corsOrigin = process.env.CORS_ORIGIN || "*";
+app.use(cors({ origin: corsOrigin }));
+
+// Test endpoint to verify backend is accessible from other computers
+app.get("/api/test", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    message: "Backend API is accessible",
+    timestamp: new Date().toISOString(),
+    clientIp: req.ip || req.connection.remoteAddress,
+    serverTime: new Date().toISOString()
+  });
+});
 
 // MongoDB configuration - uses separate database "timebank" (not "test")
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
@@ -440,12 +453,13 @@ io.on("connection", (socket) => {
     console.log(`[Chat] ✅ User ${normalizedAddress} joined room ${roomId} (socket: ${socket.id})`);
     console.log(`[Chat] Room ${roomId} now has ${io.sockets.adapter.rooms.get(roomId)?.size || 0} users`);
     
-    // Track online status
+    // Track online status FIRST (before checking other user's status)
     if (!onlineUsers.has(normalizedAddress)) {
       onlineUsers.set(normalizedAddress, { socketIds: new Set(), lastSeen: Date.now() });
     }
     onlineUsers.get(normalizedAddress).socketIds.add(socket.id);
     onlineUsers.get(normalizedAddress).lastSeen = Date.now();
+    console.log(`[Status] ✅ Marked ${normalizedAddress} as online (total sockets: ${onlineUsers.get(normalizedAddress).socketIds.size})`);
     
     // Notify ALL users in room (including self) that this user is online
     io.to(roomId).emit("user-status", { userAddress: normalizedAddress, status: "online" });
@@ -466,17 +480,57 @@ io.on("connection", (socket) => {
       socket.emit("chat-history", []);
     }
     
-    // Send online status of other user if they're online
+    // Send online status of other user - check ALL sockets in the room
     const [user1, user2] = roomId.split("_");
     if (user1 && user2) {
       const otherUser = user1.toLowerCase() === normalizedAddress ? user2.toLowerCase() : user1.toLowerCase();
-      if (onlineUsers.has(otherUser) && onlineUsers.get(otherUser).socketIds.size > 0) {
+      
+      // Check if other user is in the room by checking all sockets in the room
+      const room = io.sockets.adapter.rooms.get(roomId);
+      let otherUserOnline = false;
+      
+      if (room) {
+        // Check all sockets in the room to see if any belong to the other user
+        for (const socketId of room) {
+          const otherSocket = io.sockets.sockets.get(socketId);
+          if (otherSocket && otherSocket.data.userAddress === otherUser) {
+            otherUserOnline = true;
+            break;
+          }
+        }
+      }
+      
+      // Also check onlineUsers map as backup
+      if (!otherUserOnline && onlineUsers.has(otherUser) && onlineUsers.get(otherUser).socketIds.size > 0) {
+        otherUserOnline = true;
+      }
+      
+      if (otherUserOnline) {
         socket.emit("user-status", { userAddress: otherUser, status: "online" });
         console.log(`[Status] ✅ Notified ${normalizedAddress} that ${otherUser} is online`);
       } else {
         socket.emit("user-status", { userAddress: otherUser, status: "offline" });
-        console.log(`[Status] ⚠️ Notified ${normalizedAddress} that ${otherUser} is offline (not connected)`);
+        console.log(`[Status] ⚠️ Notified ${normalizedAddress} that ${otherUser} is offline (not in room)`);
       }
+      
+      // Also re-broadcast other user's status to the room after a short delay (in case they just joined)
+      setTimeout(() => {
+        const room = io.sockets.adapter.rooms.get(roomId);
+        let otherUserOnlineNow = false;
+        if (room) {
+          for (const socketId of room) {
+            const otherSocket = io.sockets.sockets.get(socketId);
+            if (otherSocket && otherSocket.data.userAddress === otherUser) {
+              otherUserOnlineNow = true;
+              break;
+            }
+          }
+        }
+        if (otherUserOnlineNow) {
+          io.to(roomId).emit("user-status", { userAddress: otherUser, status: "online" });
+          console.log(`[Status] ✅ Re-broadcasted online status for ${otherUser} after delay`);
+        }
+      }, 500);
     }
     
     console.log(`[Chat] ✅ Setup complete for ${normalizedAddress} in room ${roomId}`);
@@ -683,9 +737,15 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
+// Listen on all network interfaces (0.0.0.0) so other computers can connect
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`TimeBank backend running on port ${PORT}`);
   console.log(`Socket.io server ready for real-time chat and video calls`);
+  console.log(`Backend accessible at:`);
+  console.log(`  - http://localhost:${PORT} (local)`);
+  console.log(`  - http://0.0.0.0:${PORT} (all interfaces)`);
+  console.log(`\n⚠️  Make sure your firewall allows connections on port ${PORT}`);
+  console.log(`⚠️  Other users should use: http://YOUR_IP_ADDRESS:${PORT}`);
 });
 
 

@@ -9,7 +9,25 @@ export function useSocket() {
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
-    console.log(`[Socket] Connecting to: ${socketUrl}`)
+    console.log(`[Socket] 🔌 Connecting to: ${socketUrl}`)
+    console.log(`[Socket] 📍 Backend URL from env: ${CONTRACTS.sepolia.backendBaseUrl}`)
+    
+    // Test backend connection first
+    fetch(`${socketUrl}/health`)
+      .then(res => res.json())
+      .then(data => {
+        console.log(`[Socket] ✅ Backend health check passed:`, data)
+      })
+      .catch(err => {
+        console.error(`[Socket] ❌ Backend health check failed:`, err)
+        console.error(`[Socket] ⚠️  Cannot reach backend at ${socketUrl}`)
+        console.error(`[Socket] ⚠️  Make sure:`)
+        console.error(`[Socket]    1. Backend server is running`)
+        console.error(`[Socket]    2. Backend is listening on 0.0.0.0 (not just localhost)`)
+        console.error(`[Socket]    3. Firewall allows connections on port 4000`)
+        console.error(`[Socket]    4. VITE_BACKEND_URL is set correctly in frontend/.env`)
+      })
+    
     const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
