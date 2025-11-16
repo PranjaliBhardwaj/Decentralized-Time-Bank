@@ -437,6 +437,9 @@ io.on("connection", (socket) => {
     socket.data.roomId = roomId;
     socket.data.userAddress = normalizedAddress;
     
+    console.log(`[Chat] ✅ User ${normalizedAddress} joined room ${roomId} (socket: ${socket.id})`);
+    console.log(`[Chat] Room ${roomId} now has ${io.sockets.adapter.rooms.get(roomId)?.size || 0} users`);
+    
     // Track online status
     if (!onlineUsers.has(normalizedAddress)) {
       onlineUsers.set(normalizedAddress, { socketIds: new Set(), lastSeen: Date.now() });
@@ -444,8 +447,9 @@ io.on("connection", (socket) => {
     onlineUsers.get(normalizedAddress).socketIds.add(socket.id);
     onlineUsers.get(normalizedAddress).lastSeen = Date.now();
     
-    // Notify other user in room that this user is online
+    // Notify ALL users in room (including self) that this user is online
     io.to(roomId).emit("user-status", { userAddress: normalizedAddress, status: "online" });
+    console.log(`[Status] ✅ Broadcasted online status for ${normalizedAddress} to room ${roomId}`);
     
     // Load messages from MongoDB (fast and reliable)
     const dbMessages = await loadChatFromDB(roomId);
@@ -453,7 +457,7 @@ io.on("connection", (socket) => {
     if (dbMessages.length > 0) {
       // Update cache with DB messages
       chatRoomsCache.set(roomId, dbMessages);
-      console.log(`[Chat] Loaded ${dbMessages.length} messages from MongoDB for room ${roomId}`);
+      console.log(`[Chat] 📜 Loaded ${dbMessages.length} messages from MongoDB for room ${roomId}`);
       socket.emit("chat-history", dbMessages);
     } else {
       // No messages in DB, initialize empty cache
@@ -468,20 +472,14 @@ io.on("connection", (socket) => {
       const otherUser = user1.toLowerCase() === normalizedAddress ? user2.toLowerCase() : user1.toLowerCase();
       if (onlineUsers.has(otherUser) && onlineUsers.get(otherUser).socketIds.size > 0) {
         socket.emit("user-status", { userAddress: otherUser, status: "online" });
-        console.log(`[Status] Notified ${normalizedAddress} that ${otherUser} is online`);
+        console.log(`[Status] ✅ Notified ${normalizedAddress} that ${otherUser} is online`);
       } else {
         socket.emit("user-status", { userAddress: otherUser, status: "offline" });
-        console.log(`[Status] Notified ${normalizedAddress} that ${otherUser} is offline`);
+        console.log(`[Status] ⚠️ Notified ${normalizedAddress} that ${otherUser} is offline (not connected)`);
       }
     }
     
-    // Also broadcast to other user that this user is now online
-    if (user1 && user2) {
-      const otherUser = user1.toLowerCase() === normalizedAddress ? user2.toLowerCase() : user1.toLowerCase();
-      io.to(roomId).emit("user-status", { userAddress: normalizedAddress, status: "online" });
-    }
-    
-    console.log(`[Chat] User ${normalizedAddress} joined room ${roomId} (socket: ${socket.id})`);
+    console.log(`[Chat] ✅ Setup complete for ${normalizedAddress} in room ${roomId}`);
   });
 
   // Handle typing indicators
@@ -510,11 +508,12 @@ io.on("connection", (socket) => {
     const { roomId, message, sender, timestamp, type = "text" } = data;
     
     if (!roomId || !sender || !message) {
-      console.warn("[Chat] Invalid message data:", data);
+      console.warn("[Chat] ❌ Invalid message data:", data);
       return;
     }
     
     const normalizedSender = sender.toLowerCase();
+    console.log(`[Chat] 📨 Received message from ${normalizedSender} in room ${roomId}: "${message.substring(0, 50)}..."`);
     
     // Stop typing indicator
     if (typingUsers.has(roomId)) {
@@ -538,20 +537,28 @@ io.on("connection", (socket) => {
     messages.push(messageObj);
     chatRoomsCache.set(roomId, messages);
     
-    // INSTANT delivery via socket.io (real-time) - broadcast to ALL users in room including sender
-    console.log(`[Chat] Broadcasting message to room ${roomId} from ${normalizedSender}`);
-    console.log(`[Chat] Room ${roomId} has ${io.sockets.adapter.rooms.get(roomId)?.size || 0} connected users`);
-    // Broadcast to all users in the room (including sender for consistency)
+    // Get room info
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const userCount = room ? room.size : 0;
+    console.log(`[Chat] 📢 Broadcasting message to room ${roomId}`);
+    console.log(`[Chat] 👥 Room has ${userCount} connected user(s)`);
+    
+    if (userCount === 0) {
+      console.warn(`[Chat] ⚠️ WARNING: Room ${roomId} has NO connected users! Message will not be delivered.`);
+      console.warn(`[Chat] ⚠️ The other user must open the chat and join the room to receive messages.`);
+    }
+    
+    // INSTANT delivery via socket.io (real-time) - broadcast to ALL users in room
     io.to(roomId).emit("chat-message", messageObj);
-    console.log(`[Chat] ✅ Message broadcasted to room ${roomId}`);
+    console.log(`[Chat] ✅ Message broadcasted to ${userCount} user(s) in room ${roomId}`);
     
     // Save to MongoDB in background (fast and reliable, doesn't block delivery)
     saveChatMessageToDB(roomId, messageObj).then(success => {
       if (success) {
-        console.log(`[Chat] Message saved to MongoDB`);
+        console.log(`[Chat] 💾 Message saved to MongoDB`);
       }
     }).catch(err => {
-      console.error("[Chat] Failed to save message to MongoDB:", err.message);
+      console.error("[Chat] ❌ Failed to save message to MongoDB:", err.message);
     });
   });
 
@@ -617,16 +624,26 @@ io.on("connection", (socket) => {
   socket.on("video-call-status", (data) => {
     const { roomId, status, sender } = data; // status: 'calling', 'ringing', 'answered', 'ended'
     if (!roomId || !status || !sender) {
-      console.warn("[VideoCall] Invalid video-call-status data:", data);
+      console.warn("[VideoCall] ❌ Invalid video-call-status data:", data);
       return;
     }
     const normalizedSender = sender.toLowerCase();
-    console.log(`[VideoCall] Status update: ${status} in room ${roomId} from ${normalizedSender}`);
-    // Broadcast to ALL users in room EXCEPT sender (to avoid self-notifications)
+    console.log(`[VideoCall] 📞 Status update: ${status} in room ${roomId} from ${normalizedSender}`);
+    
+    // Get room info
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const userCount = room ? room.size : 0;
+    console.log(`[VideoCall] 👥 Room ${roomId} has ${userCount} connected user(s)`);
+    
+    if (userCount === 0) {
+      console.warn(`[VideoCall] ⚠️ WARNING: Room ${roomId} has NO connected users! Call notification will not be delivered.`);
+      console.warn(`[VideoCall] ⚠️ The other user must be on the Marketplace page to receive call notifications.`);
+    }
+    
+    // Broadcast to ALL users in room (including sender for consistency, frontend will filter)
     // Include roomId in the response so frontend can verify
-    socket.to(roomId).emit("video-call-status", { status, sender: normalizedSender, roomId });
-    // Also emit to sender for consistency (but frontend will ignore own updates)
-    socket.emit("video-call-status", { status, sender: normalizedSender, roomId });
+    io.to(roomId).emit("video-call-status", { status, sender: normalizedSender, roomId });
+    console.log(`[VideoCall] ✅ Call status broadcasted to ${userCount} user(s) in room ${roomId}`);
   });
 
   // Disconnect
@@ -670,4 +687,5 @@ server.listen(PORT, () => {
   console.log(`TimeBank backend running on port ${PORT}`);
   console.log(`Socket.io server ready for real-time chat and video calls`);
 });
+
 

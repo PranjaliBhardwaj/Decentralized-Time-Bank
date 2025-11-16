@@ -191,6 +191,8 @@ export function Chat({ otherUser, listingTitle, onClose }: ChatProps) {
       return
     }
 
+    const messageText = inputMessage.trim()
+    
     // Stop typing indicator
     if (isTyping) {
       setIsTyping(false)
@@ -202,14 +204,12 @@ export function Chat({ otherUser, listingTitle, onClose }: ChatProps) {
 
     const messageData = {
       roomId,
-      message: inputMessage.trim(),
+      message: messageText,
       sender: address.toLowerCase(),
       timestamp: new Date().toISOString(),
     }
 
-    console.log('[Chat] 📤 Sending message:', messageData)
-    socket.emit('chat-message', messageData)
-    setInputMessage('')
+    console.log('[Chat] 📤 Sending message to server:', { roomId, message: messageText.substring(0, 50) + '...', sender: messageData.sender })
     
     // Optimistically add message to UI immediately (will be confirmed by server response)
     const tempMessage: ChatMessage = {
@@ -217,10 +217,21 @@ export function Chat({ otherUser, listingTitle, onClose }: ChatProps) {
       ...messageData,
       type: 'text',
     }
-    setMessages((prev) => [...prev, tempMessage])
+    setMessages((prev) => {
+      const updated = [...prev, tempMessage]
+      const sorted = updated.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      return sorted
+    })
+    setInputMessage('')
+    
+    // Scroll immediately
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, 50)
+    
+    // Send to server
+    socket.emit('chat-message', messageData)
+    console.log('[Chat] ✅ Message emitted to server, waiting for broadcast...')
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

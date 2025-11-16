@@ -204,9 +204,17 @@ export function VideoCall({ otherUser, listingTitle, onClose }: VideoCallProps) 
       // Create and send offer
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
-      console.log('[VideoCall] Sending offer and call status')
+      console.log('[VideoCall] 📞 Starting call - sending offer and call status')
+      console.log('[VideoCall] Room ID:', roomId)
+      console.log('[VideoCall] Sender:', normalizedAddress)
+      
+      // Send WebRTC offer
       socket.emit('webrtc-offer', { roomId, offer, sender: normalizedAddress })
+      console.log('[VideoCall] ✅ WebRTC offer sent')
+      
+      // Send call status
       socket.emit('video-call-status', { roomId, status: 'calling', sender: normalizedAddress })
+      console.log('[VideoCall] ✅ Call status "calling" sent to room', roomId)
 
       setCallStatus('calling')
       setIsInitiator(true)
